@@ -6,6 +6,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Status](https://img.shields.io/badge/status-alpha-orange)
+[![PyPI](https://img.shields.io/pypi/v/pipeverify)](https://pypi.org/project/pipeverify/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23542278.svg)](https://doi.org/10.5281/zenodo.23542278)
 
 A pipeline change can pass every test, finish on time and keep the schema intact while quietly
 dropping rows, duplicating keys or changing what a column means. More of these changes are now
