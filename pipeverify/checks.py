@@ -113,8 +113,8 @@ def run_checks(
         if k not in sb or k not in sa:
             raise ValueError(f"Key column '{k}' is missing from the before or after table")
 
-    n_before = con.execute(f"SELECT count(*) FROM {q(before)}").fetchone()[0]
-    n_after = con.execute(f"SELECT count(*) FROM {q(after)}").fetchone()[0]
+    n_before = con.execute(f"SELECT count(*) FROM {q(before)}").fetchall()[0][0]
+    n_after = con.execute(f"SELECT count(*) FROM {q(after)}").fetchall()[0][0]
     stats: dict[str, Any] = {"rows_before": n_before, "rows_after": n_after,
                              "columns_before": len(sb), "columns_after": len(sa)}
 
@@ -152,9 +152,9 @@ def run_checks(
     if key:
         kcols = ", ".join(q(k) for k in key)
         dup_before = con.execute(
-            f"SELECT count(*) FROM (SELECT {kcols} FROM {q(before)} GROUP BY ALL HAVING count(*) > 1)").fetchone()[0]
+            f"SELECT count(*) FROM (SELECT {kcols} FROM {q(before)} GROUP BY ALL HAVING count(*) > 1)").fetchall()[0][0]
         dup_after = con.execute(
-            f"SELECT count(*) FROM (SELECT {kcols} FROM {q(after)} GROUP BY ALL HAVING count(*) > 1)").fetchone()[0]
+            f"SELECT count(*) FROM (SELECT {kcols} FROM {q(after)} GROUP BY ALL HAVING count(*) > 1)").fetchall()[0][0]
         stats.update(duplicate_keys_before=dup_before, duplicate_keys_after=dup_after)
         if dup_after > dup_before:
             findings.append(Finding("duplicate_keys", BLOCK,
@@ -167,11 +167,11 @@ def run_checks(
         on = " AND ".join(f"b.{q(k)} IS NOT DISTINCT FROM a.{q(k)}" for k in key)
         missing = con.execute(
             f"SELECT count(*) FROM (SELECT DISTINCT {kcols} FROM {q(before)}) b "
-            f"WHERE NOT EXISTS (SELECT 1 FROM {q(after)} a WHERE {on})").fetchone()[0]
+            f"WHERE NOT EXISTS (SELECT 1 FROM {q(after)} a WHERE {on})").fetchall()[0][0]
         new = con.execute(
             f"SELECT count(*) FROM (SELECT DISTINCT {kcols} FROM {q(after)}) a "
-            f"WHERE NOT EXISTS (SELECT 1 FROM {q(before)} b WHERE {on})").fetchone()[0]
-        distinct_before = con.execute(f"SELECT count(*) FROM (SELECT DISTINCT {kcols} FROM {q(before)})").fetchone()[0]
+            f"WHERE NOT EXISTS (SELECT 1 FROM {q(before)} b WHERE {on})").fetchall()[0][0]
+        distinct_before = con.execute(f"SELECT count(*) FROM (SELECT DISTINCT {kcols} FROM {q(before)})").fetchall()[0][0]
         stats.update(missing_keys=missing, new_keys=new)
         if missing:
             pct = missing / max(distinct_before, 1) * 100
@@ -193,7 +193,7 @@ def run_checks(
     for c in common:
         nb, na = con.execute(
             f"SELECT (SELECT avg(CASE WHEN {q(c)} IS NULL THEN 1.0 ELSE 0 END) FROM {q(before)}), "
-            f"(SELECT avg(CASE WHEN {q(c)} IS NULL THEN 1.0 ELSE 0 END) FROM {q(after)})").fetchone()
+            f"(SELECT avg(CASE WHEN {q(c)} IS NULL THEN 1.0 ELSE 0 END) FROM {q(after)})").fetchall()[0]
         nb, na = float(nb or 0) * 100, float(na or 0) * 100
         rise = na - nb
         if rise > 0:
@@ -207,7 +207,7 @@ def run_checks(
 
     # 5. changed values on matched keys
     if unique_keys_join is not None:
-        matched = con.execute(f"SELECT count(*) FROM _pv_ub b JOIN _pv_ua a ON {unique_keys_join}").fetchone()[0]
+        matched = con.execute(f"SELECT count(*) FROM _pv_ub b JOIN _pv_ua a ON {unique_keys_join}").fetchall()[0][0]
         stats["matched_rows"] = matched
         for c in common:
             if c in key:
@@ -219,7 +219,7 @@ def run_checks(
             else:
                 diff = f"CAST(b.{q(c)} AS VARCHAR) IS DISTINCT FROM CAST(a.{q(c)} AS VARCHAR)"
             changed = con.execute(
-                f"SELECT count(*) FROM _pv_ub b JOIN _pv_ua a ON {unique_keys_join} WHERE {diff}").fetchone()[0]
+                f"SELECT count(*) FROM _pv_ub b JOIN _pv_ua a ON {unique_keys_join} WHERE {diff}").fetchall()[0][0]
             if not changed:
                 continue
             pct = changed / max(matched, 1) * 100
@@ -243,7 +243,7 @@ def run_checks(
             continue
         tb, ta = con.execute(
             f"SELECT (SELECT sum(CAST({q(c)} AS DOUBLE)) FROM {q(before)}), "
-            f"(SELECT sum(CAST({q(c)} AS DOUBLE)) FROM {q(after)})").fetchone()
+            f"(SELECT sum(CAST({q(c)} AS DOUBLE)) FROM {q(after)})").fetchall()[0]
         if tb is None and ta is None:
             continue
         tb, ta = float(tb or 0), float(ta or 0)
@@ -263,7 +263,7 @@ def run_checks(
     for c in common:
         if c in key or not (_is_text(sb[c]) and _is_text(sa[c])):
             continue
-        d = con.execute(f"SELECT count(DISTINCT {q(c)}) FROM {q(before)}").fetchone()[0]
+        d = con.execute(f"SELECT count(DISTINCT {q(c)}) FROM {q(before)}").fetchall()[0][0]
         if d == 0 or d > t.category_max_distinct:
             continue
         new_vals = [r[0] for r in con.execute(

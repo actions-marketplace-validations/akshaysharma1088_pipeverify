@@ -70,8 +70,8 @@ def run_source_checks(con: duckdb.DuckDBPyConnection, after: str, source: str, s
     kcols = ", ".join(q("_k" + str(i)) for i in range(len(key)))
 
     findings: list[Finding] = []
-    n_out = con.execute("SELECT count(*) FROM _pv_out").fetchone()[0]
-    n_src = con.execute(f"SELECT count(DISTINCT ({kcols})) FROM _pv_src").fetchone()[0]
+    n_out = con.execute("SELECT count(*) FROM _pv_out").fetchall()[0][0]
+    n_src = con.execute(f"SELECT count(DISTINCT ({kcols})) FROM _pv_src").fetchall()[0][0]
     stats = {"source_keys": n_src, "output_rows": n_out}
 
     for oc in spec.columns:
@@ -80,7 +80,7 @@ def run_source_checks(con: duckdb.DuckDBPyConnection, after: str, source: str, s
             n = con.execute(
                 f"SELECT count(*) FROM (SELECT {kcols} FROM _pv_src GROUP BY ALL "
                 f"HAVING count(DISTINCT CAST({v} AS VARCHAR)) > 1) s "
-                f"WHERE EXISTS (SELECT 1 FROM _pv_out o WHERE {on})").fetchone()[0]
+                f"WHERE EXISTS (SELECT 1 FROM _pv_out o WHERE {on})").fetchall()[0][0]
             if n:
                 ex = con.execute(
                     f"SELECT {kcols}, list(DISTINCT CAST({v} AS VARCHAR) ORDER BY CAST({v} AS VARCHAR)) FROM _pv_src "
@@ -99,7 +99,7 @@ def run_source_checks(con: duckdb.DuckDBPyConnection, after: str, source: str, s
             n = con.execute(
                 f"SELECT count(*) FROM _pv_out o WHERE EXISTS (SELECT 1 FROM _pv_src s WHERE {on}) "
                 f"AND NOT EXISTS (SELECT 1 FROM _pv_src s WHERE {on} AND (({num}) OR {txt} "
-                f"OR (o.{q(oc)} IS NULL AND s.{v} IS NULL)))").fetchone()[0]
+                f"OR (o.{q(oc)} IS NULL AND s.{v} IS NULL)))").fetchall()[0][0]
             if n:
                 pct = n / max(n_out, 1) * 100
                 sev = _grade(pct, t.source_mismatch_review_pct, t.source_mismatch_block_pct)
@@ -108,14 +108,14 @@ def run_source_checks(con: duckdb.DuckDBPyConnection, after: str, source: str, s
                                         oc, {"count": n, "pct": round(pct, 4)}))
     if "missing" in wanted:
         n = con.execute(f"SELECT count(*) FROM (SELECT DISTINCT {kcols} FROM _pv_src) s "
-                        f"WHERE NOT EXISTS (SELECT 1 FROM _pv_out o WHERE {on})").fetchone()[0]
+                        f"WHERE NOT EXISTS (SELECT 1 FROM _pv_out o WHERE {on})").fetchall()[0][0]
         if n:
             pct = n / max(n_src, 1) * 100
             findings.append(Finding("source_missing", _grade(pct, t.source_missing_review_pct, t.source_missing_block_pct),
                                     f"{n:,} source key(s) never reached the output ({pct:.2f}%)", None,
                                     {"count": n, "pct": round(pct, 4)}))
     if "orphan" in wanted:
-        n = con.execute(f"SELECT count(*) FROM _pv_out o WHERE NOT EXISTS (SELECT 1 FROM _pv_src s WHERE {on})").fetchone()[0]
+        n = con.execute(f"SELECT count(*) FROM _pv_out o WHERE NOT EXISTS (SELECT 1 FROM _pv_src s WHERE {on})").fetchall()[0][0]
         if n:
             pct = n / max(n_out, 1) * 100
             findings.append(Finding("source_orphan", REVIEW if pct > 0 else INFO,

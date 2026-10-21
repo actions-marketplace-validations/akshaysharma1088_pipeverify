@@ -79,7 +79,7 @@ def verify(before: Any, after: Any, *, name: str = "table", key: list[str] | str
                                         "No key given, so row-level changes were not compared. Add a key for stronger checks."))
         else:
             findings = []
-            stats = {"rows_after": con.execute('SELECT count(*) FROM "after"').fetchone()[0]}
+            stats = {"rows_after": con.execute('SELECT count(*) FROM "after"').fetchall()[0][0]}
         if source is not None:
             spec = SourceSpec.from_dict(source)
             load(con, parse_source(spec.data, base_dir), "source")

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (2026-10-21)
+
+- Fix: works with DuckDB 2.0, which no longer allows a new query while an earlier
+  result is still open. Source checks on DataFrames failed with a ResourceInUseException.
+- CI: the demo job now sets up Python before installing packages.
+
 ## 0.2.0 (2026-10-21)
 
 - Source checks: compare an output table with the raw source it was built from.
