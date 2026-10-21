@@ -184,7 +184,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # ... build the "after" snapshots for this PR here ...
-      - uses: akshaysharma1088/pipeverify@v0.1.0
+      - uses: akshaysharma1088/pipeverify@v0.2.0
         with:
           config: pipeverify.yml
           fail-on: block      # or review, or never
