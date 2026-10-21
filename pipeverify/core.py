@@ -10,6 +10,7 @@ import duckdb
 import yaml
 
 from .checks import BLOCK, PASS, RANK, REVIEW, Finding, Thresholds, run_checks, verdict
+from .source_checks import SourceSpec, run_source_checks
 from .sources import load, parse_source
 
 
@@ -50,33 +51,47 @@ class RunResult:
 def verify(before: Any, after: Any, *, name: str = "table", key: list[str] | str | None = None,
            expect_change: list[str] | None = None, ignore: list[str] | None = None,
            expect_row_change: bool = False, thresholds: Thresholds | dict | None = None,
-           base_dir: str = ".") -> TableResult:
-    """Compare two snapshots of one table.
+           source: SourceSpec | dict | None = None, base_dir: str = ".") -> TableResult:
+    """Compare two snapshots of one table, and optionally the output with its raw source.
 
-    `before` and `after` can be file paths, duckdb:<file>:<table> strings,
-    config mappings, or pandas DataFrames.
+    `before`, `after` and `source["data"]` can be file paths, duckdb:<file>:<table>
+    strings, config mappings, or pandas DataFrames. `before` may be None when only
+    source checks are wanted (for example when no earlier snapshot exists).
     """
     if isinstance(key, str):
         key = [k.strip() for k in key.split(",") if k.strip()]
     if not isinstance(thresholds, Thresholds):
         thresholds = Thresholds.from_dict(thresholds)
-    src_b, src_a = parse_source(before, base_dir), parse_source(after, base_dir)
+    if before is None and source is None:
+        raise ValueError("Give a before snapshot, a source, or both")
+    src_b = parse_source(before, base_dir) if before is not None else None
+    src_a = parse_source(after, base_dir)
     con = duckdb.connect()
     try:
-        load(con, src_b, "before")
         load(con, src_a, "after")
-        findings, stats = run_checks(con, "before", "after", key=key, expect_change=expect_change,
-                                     ignore=ignore, expect_row_change=expect_row_change,
-                                     thresholds=thresholds)
-        if not key:
-            findings.append(Finding("keys", "info",
-                                    "No key given, so row-level changes were not compared. Add a key for stronger checks."))
+        if src_b is not None:
+            load(con, src_b, "before")
+            findings, stats = run_checks(con, "before", "after", key=key, expect_change=expect_change,
+                                         ignore=ignore, expect_row_change=expect_row_change,
+                                         thresholds=thresholds)
+            if not key:
+                findings.append(Finding("keys", "info",
+                                        "No key given, so row-level changes were not compared. Add a key for stronger checks."))
+        else:
+            findings = []
+            stats = {"rows_after": con.execute('SELECT count(*) FROM "after"').fetchone()[0]}
+        if source is not None:
+            spec = SourceSpec.from_dict(source)
+            load(con, parse_source(spec.data, base_dir), "source")
+            sf, sstats = run_source_checks(con, "after", "source", spec, key or [], thresholds)
+            findings += sf
+            stats.update(sstats)
     finally:
         con.close()
     order = {BLOCK: 0, REVIEW: 1, "info": 2, PASS: 3}
     findings.sort(key=lambda f: order[f.severity])
     return TableResult(name=name, verdict=verdict(findings), findings=findings, stats=stats,
-                       before=src_b.describe(), after=src_a.describe())
+                       before=src_b.describe() if src_b else "(none)", after=src_a.describe())
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -99,10 +114,10 @@ def run_config(path: str, only: list[str] | None = None) -> RunResult:
             continue
         th = {**defaults, **(spec.get("thresholds") or {})}
         try:
-            res = verify(spec["before"], spec["after"], name=str(name), key=spec.get("key"),
+            res = verify(spec.get("before"), spec["after"], name=str(name), key=spec.get("key"),
                          expect_change=spec.get("expect_change"), ignore=spec.get("ignore"),
                          expect_row_change=bool(spec.get("expect_row_change", False)),
-                         thresholds=th, base_dir=base_dir)
+                         thresholds=th, source=spec.get("source"), base_dir=base_dir)
         except Exception as exc:  # report the table as blocked, keep checking the rest
             res = TableResult(name=str(name), verdict=BLOCK, stats={},
                               findings=[Finding("error", BLOCK, f"Could not check this table: {exc}")],

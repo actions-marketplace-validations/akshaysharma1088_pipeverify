@@ -97,27 +97,40 @@ def main() -> None:
 @main.command()
 @click.argument("before")
 @click.argument("after")
+@click.option("--source", "source_data", help="Raw source table the output was built from (enables source checks).")
+@click.option("--source-key", help="Key column(s) in the source, if named differently from --key.")
+@click.option("--source-column", "source_columns", multiple=True,
+              help="Column to check against the source, as out=src or just name. Repeatable.")
+@click.option("--source-where", help="SQL filter for source rows that should reach the output.")
 @click.option("--key", "-k", help="Comma-separated key column(s) that identify a row.")
 @click.option("--expect-change", "-e", multiple=True, help="Column this change is meant to modify. Repeatable.")
 @click.option("--ignore", "-i", multiple=True, help="Column to skip, such as a load timestamp. Repeatable.")
 @click.option("--expect-row-change", is_flag=True, help="Rows are expected to be added or removed.")
 @click.option("--name", default=None, help="Name to show for the table.")
 @with_output_options
-def compare(before, after, key, expect_change, ignore, expect_row_change, name,
+def compare(before, after, source_data, source_key, source_columns, source_where,
+            key, expect_change, ignore, expect_row_change, name,
             fmt, output, summary, fail_on, explain, show_info, json_out, markdown_out):
     """Compare one table BEFORE and AFTER a change.
+
+    Use - as BEFORE to run only the source checks.
 
     \b
     Examples:
       pipeverify compare before.parquet after.parquet --key order_id
+      pipeverify compare - silver.parquet -k txn_id --source raw.parquet --source-column amount
       pipeverify compare duckdb:prod.db:gold.sales duckdb:dev.db:gold.sales -k id
     """
     import time
     start = time.perf_counter()
+    source = None
+    if source_data:
+        cols = dict((c.split("=", 1) if "=" in c else (c, c)) for c in source_columns)
+        source = {"data": source_data, "key": source_key, "columns": cols, "where": source_where}
     try:
-        res = verify(before, after, name=name or os.path.basename(str(after)), key=key,
+        res = verify(None if before == "-" else before, after, name=name or os.path.basename(str(after)), key=key,
                      expect_change=list(expect_change), ignore=list(ignore),
-                     expect_row_change=expect_row_change)
+                     expect_row_change=expect_row_change, source=source)
     except Exception as exc:
         raise click.ClickException(str(exc))
     result = RunResult(tables=[res], seconds=time.perf_counter() - start)

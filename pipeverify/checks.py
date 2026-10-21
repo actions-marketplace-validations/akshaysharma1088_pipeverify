@@ -38,6 +38,10 @@ class Thresholds:
     sum_shift_block_pct: float = 5.0
     category_max_distinct: int = 50          # treat text columns with few values as categories
     float_tolerance: float = 1e-9
+    source_mismatch_review_pct: float = 0.0
+    source_mismatch_block_pct: float = 5.0
+    source_missing_review_pct: float = 0.0
+    source_missing_block_pct: float = 5.0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any] | None) -> "Thresholds":

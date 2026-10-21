@@ -4,8 +4,9 @@ title: "pipeverify: verify that pipeline changes leave data correct"
 authors:
   - family-names: Sharma
     given-names: Akshay
-version: 0.1.0
+version: 0.2.0
 date-released: 2026-10-21
+doi: 10.5281/zenodo.23542278
 license: Apache-2.0
 repository-code: "https://github.com/akshaysharma1088/pipeverify"
 references:

@@ -36,7 +36,10 @@ def to_text(result: RunResult, show_info: bool = False) -> str:
         s = t.stats
         if s:
             extra = f", matched {s['matched_rows']:,}" if "matched_rows" in s else ""
-            lines.append(f"        rows {s.get('rows_before', 0):,} -> {s.get('rows_after', 0):,}{extra}")
+            if "rows_before" in s:
+                lines.append(f"        rows {s['rows_before']:,} -> {s.get('rows_after', 0):,}{extra}")
+            else:
+                lines.append(f"        rows {s.get('rows_after', 0):,} (checked against source)")
         for f in t.findings:
             if f.severity == "info" and not show_info:
                 continue
@@ -57,7 +60,12 @@ def to_markdown(result: RunResult) -> str:
     for t in result.tables:
         issues = sum(1 for f in t.findings if f.severity in ("review", "block"))
         s = t.stats or {}
-        rows = f"{s.get('rows_before', '?'):,} → {s.get('rows_after', '?'):,}" if s else "n/a"
+        if "rows_before" in s:
+            rows = f"{s['rows_before']:,} → {s.get('rows_after', 0):,}"
+        elif "rows_after" in s:
+            rows = f"{s['rows_after']:,} (source check)"
+        else:
+            rows = "n/a"
         out.append(f"| `{t.name}` | {ICON[t.verdict]} {LABEL[t.verdict]} | {rows} | {issues} |")
     for t in result.tables:
         notable = [f for f in t.findings if f.severity in ("review", "block")]

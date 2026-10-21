@@ -6,6 +6,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![Status](https://img.shields.io/badge/status-alpha-orange)
+[![PyPI](https://img.shields.io/pypi/v/pipeverify)](https://pypi.org/project/pipeverify/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23542278.svg)](https://doi.org/10.5281/zenodo.23542278)
 
 A pipeline change can pass every test, finish on time and keep the schema intact while quietly
 dropping rows, duplicating keys or changing what a column means. More of these changes are now
@@ -129,6 +131,44 @@ Exit code is `1` when the verdict reaches `--fail-on` (default `block`), otherwi
 
 Columns listed in `expect_change` are reported but never raise the verdict. All thresholds can be
 changed globally or per table; see [`pipeverify/checks.py`](pipeverify/checks.py) for every option.
+
+## Source checks
+
+A before/after diff only sees damage to rows that already existed. Errors in **new** data need
+evidence the pipeline does not control: the raw source. Add a `source` block to a table:
+
+```yaml
+tables:
+  - name: silver.transactions
+    after: snapshots/pr/silver_transactions.parquet
+    before: snapshots/main/silver_transactions.parquet   # optional
+    key: [txn_id]
+    source:
+      data: landing/raw_transactions.parquet
+      key: [txn_id]
+      columns: {amount: amount}      # output column: source column
+      checks: [conflict]             # default; also mismatch, missing, orphan
+      where: "status = 'POSTED'"     # source rows that should reach the output
+```
+
+| Check | Catches | Default |
+|---|---|---|
+| `conflict` | The source sent several values for one key and the output silently kept one | on, REVIEW |
+| `mismatch` | An output value the source never sent (use only for pass-through columns) | opt-in |
+| `missing` | Source keys that never reached the output (set `where` for intended filters) | opt-in |
+| `orphan` | Output keys that are not in the source | opt-in |
+
+From the command line:
+
+```bash
+pipeverify compare - silver.parquet -k txn_id --source raw.parquet --source-column amount
+```
+
+In a pilot on the 209 executed fixes in the PipeMend benchmark (25 harmful), production-style
+monitors caught 16 harmful fixes, and the source conflict check caught the 9 that the monitors
+approved. Together they caught all 25, at the cost of a REVIEW on 21 of 184 correct fixes,
+all on incidents where the source data really was ambiguous. This is a small pilot on synthetic
+data; a larger evaluation is in progress.
 
 ## GitHub Action
 

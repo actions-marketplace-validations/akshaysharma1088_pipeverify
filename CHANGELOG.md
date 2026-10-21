@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 (2026-10-21)
+
+- Source checks: compare an output table with the raw source it was built from.
+  `source_conflict` (default) flags keys where the source sent conflicting values and the
+  output silently kept one. `source_mismatch`, `source_missing` and `source_orphan` are opt-in.
+- `before` is now optional, so source checks can run when no earlier snapshot exists
+  (`pipeverify compare - after.parquet --source raw.parquet ...`).
+- New thresholds for source mismatch and missing keys.
+
 ## 0.1.0 (2026-10-21)
 
 First release.
