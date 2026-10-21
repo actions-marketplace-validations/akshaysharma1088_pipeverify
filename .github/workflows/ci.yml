@@ -1,0 +1,35 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: python examples/retail/make_demo.py
+      - run: pytest -q
+  demo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install duckdb && python examples/retail/make_demo.py
+      - name: Run the action on a scenario that should be flagged
+        uses: ./
+        with:
+          config: examples/retail/scenarios/5_null_creep/pipeverify.yml
+          fail-on: never
+          comment: "false"

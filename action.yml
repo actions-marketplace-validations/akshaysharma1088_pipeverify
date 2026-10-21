@@ -1,0 +1,70 @@
+name: "pipeverify"
+description: "Check that a pipeline change left the data right, not just the job green. Posts a PASS / REVIEW / BLOCK verdict."
+author: "Akshay Sharma"
+branding:
+  icon: "check-circle"
+  color: "blue"
+inputs:
+  config:
+    description: "Path to the pipeverify config file."
+    default: "pipeverify.yml"
+  fail-on:
+    description: "Fail the job at this verdict or worse: review, block or never."
+    default: "block"
+  comment:
+    description: "Post the report as a pull request comment (true/false)."
+    default: "true"
+  explain:
+    description: "Add an LLM explanation (needs ANTHROPIC_API_KEY or OPENAI_API_KEY in env)."
+    default: "false"
+  version:
+    description: "pipeverify version to install from PyPI. Leave empty to install from this action's source."
+    default: ""
+outputs:
+  verdict:
+    description: "pass, review or block"
+    value: ${{ steps.run.outputs.verdict }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install pipeverify
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "pipeverify==${{ inputs.version }}"
+        else
+          pip install "${{ github.action_path }}"
+        fi
+        if [ "${{ inputs.explain }}" = "true" ]; then pip install "anthropic>=0.40" "openai>=1.40"; fi
+    - name: Run pipeverify
+      id: run
+      shell: bash
+      run: |
+        set +e
+        EXTRA=""
+        if [ "${{ inputs.explain }}" = "true" ]; then EXTRA="--explain"; fi
+        pipeverify run -c "${{ inputs.config }}" --fail-on never $EXTRA \
+          --json-out pipeverify-report.json --markdown-out pipeverify-report.md
+        VERDICT=$(python -c "import json;print(json.load(open('pipeverify-report.json'))['verdict'])")
+        echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+    - name: Comment on pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh pr comment "${{ github.event.pull_request.number }}" --body-file pipeverify-report.md --edit-last \
+          || gh pr comment "${{ github.event.pull_request.number }}" --body-file pipeverify-report.md \
+          || echo "Could not comment (needs pull-requests: write permission)."
+    - name: Apply verdict
+      shell: bash
+      run: |
+        V="${{ steps.run.outputs.verdict }}"
+        case "${{ inputs.fail-on }}" in
+          never) exit 0 ;;
+          review) [ "$V" = "pass" ] || { echo "pipeverify verdict: $V"; exit 1; } ;;
+          *) [ "$V" != "block" ] || { echo "pipeverify verdict: $V"; exit 1; } ;;
+        esac

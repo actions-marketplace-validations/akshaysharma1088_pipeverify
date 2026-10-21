@@ -1,0 +1,7 @@
+# An agent removed duplicates on the wrong columns (store and order count, not store and day).
+tables:
+  - name: gold.daily_sales
+    before: ../../before/daily_sales.parquet
+    after: daily_sales.parquet
+    key: [store_id, sale_date]
+    ignore: [loaded_at]

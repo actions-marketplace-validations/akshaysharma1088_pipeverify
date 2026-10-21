@@ -1,0 +1,7 @@
+# A new join to a store dimension with two rows for store 12 doubles its sales.
+tables:
+  - name: gold.daily_sales
+    before: ../../before/daily_sales.parquet
+    after: daily_sales.parquet
+    key: [store_id, sale_date]
+    ignore: [loaded_at]

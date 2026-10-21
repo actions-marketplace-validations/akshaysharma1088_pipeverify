@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use pipeverify, please cite it as below."
+title: "pipeverify: verify that pipeline changes leave data correct"
+authors:
+  - family-names: Sharma
+    given-names: Akshay
+version: 0.1.0
+date-released: 2026-10-21
+license: Apache-2.0
+repository-code: "https://github.com/akshaysharma1088/pipeverify"
+references:
+  - type: software
+    title: "PipeMend: a benchmark for LLM remediation of data pipeline incidents"
+    authors:
+      - family-names: Sharma
+        given-names: Akshay
+    doi: 10.5281/zenodo.23510784

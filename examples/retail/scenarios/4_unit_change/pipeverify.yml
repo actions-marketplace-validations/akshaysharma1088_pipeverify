@@ -1,0 +1,7 @@
+# Upstream started sending West region revenue in cents. Same column, new meaning.
+tables:
+  - name: gold.daily_sales
+    before: ../../before/daily_sales.parquet
+    after: daily_sales.parquet
+    key: [store_id, sale_date]
+    ignore: [loaded_at]

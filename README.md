@@ -1,0 +1,203 @@
+# pipeverify
+
+**Check that a pipeline change left the data right, not just the job green.**
+
+[![ci](https://github.com/akshaysharma1088/pipeverify/actions/workflows/ci.yml/badge.svg)](https://github.com/akshaysharma1088/pipeverify/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Status](https://img.shields.io/badge/status-alpha-orange)
+
+A pipeline change can pass every test, finish on time and keep the schema intact while quietly
+dropping rows, duplicating keys or changing what a column means. More of these changes are now
+written by AI coding agents, which makes "the job succeeded" an even weaker signal.
+
+pipeverify compares your tables **before and after** a change and gives a verdict:
+
+| Verdict | Meaning | Default CI behaviour |
+|---|---|---|
+| ✅ **PASS** | The data is the same where it should be. | Merge |
+| 🟡 **REVIEW** | Something changed that tests would not catch. A person should look. | Merge allowed, flagged |
+| ⛔ **BLOCK** | The change damages the data. | Fail the check |
+
+It works with any tool that produces tables: SQL scripts, Spark jobs, dbt, Airflow tasks or an AI
+agent's fix. It needs two snapshots, nothing else.
+
+## Why
+
+In the [PipeMend benchmark](https://github.com/akshaysharma1088/pipemend)
+([DOI 10.5281/zenodo.23510784](https://doi.org/10.5281/zenodo.23510784)), LLM agents repaired
+64 data pipeline incidents. Production-style data quality monitors approved **every** harmful fix
+the agents made. What caught them was comparing the data itself. pipeverify packages that check
+so any team can run it on every change.
+
+## Quick start
+
+```bash
+pip install pipeverify
+
+# compare two snapshots of one table
+pipeverify compare before/orders.parquet after/orders.parquet --key order_id
+```
+
+```
+BLOCK   orders.parquet
+        rows 1,200 -> 1,000, matched 1,000
+        BLOCK  Table lost 200 rows (16.67%)
+        BLOCK  200 key(s) present before are gone after (16.67%)
+        BLOCK  Total of 'revenue' moved 16.71% (1,383,131.25 -> 1,152,000.00)
+
+Verdict: BLOCK  This change damages the data. Do not merge as is.
+```
+
+Try the bundled demo, five realistic changes to a retail sales table:
+
+```bash
+git clone https://github.com/akshaysharma1088/pipeverify && cd pipeverify
+pip install -e .
+python examples/retail/make_demo.py
+for s in examples/retail/scenarios/*/; do pipeverify run -c "$s/pipeverify.yml"; done
+```
+
+| Scenario | What happened | Verdict |
+|---|---|---|
+| `1_safe_fix` | Revenue restated for late refunds on one day, as intended | ✅ PASS |
+| `2_dedupe_drops_rows` | Duplicates removed on the wrong columns, real days dropped | ⛔ BLOCK |
+| `3_join_fanout` | A join to a dimension with a duplicate row doubled one store | ⛔ BLOCK |
+| `4_unit_change` | Upstream started sending one region's revenue in cents | ⛔ BLOCK |
+| `5_null_creep` | A renamed source field left region empty for new stores | 🟡 REVIEW |
+
+Every one of these runs successfully and keeps the same schema.
+
+## Sources
+
+`before` and `after` can each be:
+
+| Source | CLI form | Config form |
+|---|---|---|
+| CSV, Parquet, JSON file | `data/orders.parquet` | `path: data/orders.parquet` |
+| DuckDB table | `duckdb:warehouse.db:gold.orders` | `{duckdb: warehouse.db, table: gold.orders}` |
+| DuckDB query | `"duckdb:warehouse.db:SELECT ..."` | `{duckdb: warehouse.db, query: "SELECT ..."}` |
+| Any SQLAlchemy database (Postgres, Snowflake, BigQuery, ...) | | `{url: "postgresql://${PGUSER}@host/db", table: gold.orders}` |
+| pandas DataFrame | | Python API |
+
+SQL databases need `pip install "pipeverify[sql]"` plus the driver for your database. Environment
+variables in URLs are expanded, so credentials stay out of the config file.
+
+## Config
+
+Check many tables at once with `pipeverify.yml` (`pipeverify init` writes a starter file):
+
+```yaml
+thresholds:              # optional, overrides the defaults below for every table
+  row_change_block_pct: 10
+tables:
+  - name: gold.daily_sales
+    before: snapshots/main/daily_sales.parquet
+    after: snapshots/pr/daily_sales.parquet
+    key: [store_id, sale_date]
+    expect_change: [revenue]   # columns this change is meant to modify
+    ignore: [loaded_at]        # columns that always change
+  - name: gold.customers
+    before: {url: "${WAREHOUSE_URL}", table: prod.customers}
+    after: {url: "${WAREHOUSE_URL}", table: pr_123.customers}
+    key: [customer_id]
+    expect_row_change: true    # this change is meant to add or remove rows
+```
+
+```bash
+pipeverify run                     # uses ./pipeverify.yml
+pipeverify run --fail-on review    # stricter: fail CI on REVIEW too
+pipeverify run --format markdown -o report.md
+pipeverify run --json-out report.json
+```
+
+Exit code is `1` when the verdict reaches `--fail-on` (default `block`), otherwise `0`.
+
+## What it checks
+
+| Check | Catches | Default |
+|---|---|---|
+| Schema | Removed, added or retyped columns | removed: BLOCK, retyped: REVIEW |
+| Row count | Rows lost or gained | REVIEW > 1%, BLOCK ≥ 10% |
+| Missing keys | Rows that existed before and are gone | REVIEW on any, BLOCK ≥ 5% |
+| New keys | Rows that did not exist before | REVIEW |
+| Duplicate keys | Fan-out from joins, double loads | BLOCK on any new duplicate |
+| Null rate | Columns going empty | REVIEW > 1 pt, BLOCK ≥ 10 pts |
+| Changed values | Matched rows whose values changed, per column | REVIEW on any, BLOCK ≥ 10% |
+| Column totals | Unit changes, partial loads, double counting | REVIEW > 0.5%, BLOCK ≥ 5% |
+| Category values | New codes in low-cardinality text columns | REVIEW |
+
+Columns listed in `expect_change` are reported but never raise the verdict. All thresholds can be
+changed globally or per table; see [`pipeverify/checks.py`](pipeverify/checks.py) for every option.
+
+## GitHub Action
+
+```yaml
+# .github/workflows/pipeverify.yml
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # ... build the "after" snapshots for this PR here ...
+      - uses: akshaysharma1088/pipeverify@v0.1.0
+        with:
+          config: pipeverify.yml
+          fail-on: block      # or review, or never
+```
+
+The action posts the report as a PR comment and in the job summary, and exposes the verdict as an
+output.
+
+## Python API
+
+```python
+import pipeverify
+
+result = pipeverify.verify(before_df, after_df, key="order_id", expect_change=["status"])
+print(result.verdict)              # "pass" | "review" | "block"
+for f in result.findings:
+    print(f.severity, f.message)
+```
+
+Useful inside an Airflow task, a notebook, or an AI agent's own loop: let the agent propose a fix,
+run `verify`, and only apply the fix on PASS.
+
+## Optional AI explanation
+
+```bash
+export ANTHROPIC_API_KEY=...       # or OPENAI_API_KEY with PIPEVERIFY_LLM_MODEL
+pip install "pipeverify[ai]"
+pipeverify run --explain
+```
+
+This adds a short plain-English explanation of what probably happened and what to check next.
+It is off by default. Only the findings are sent (check names, counts, percentages, column names);
+example values from your data are removed first. The verdict never depends on the LLM.
+
+## Roadmap
+
+- Native adapters for dbt (compare a PR's models against production), Airflow and Spark
+- Sampling and pushdown for very large tables, so checks run in the warehouse
+- Rules learned from history: what "normal" change looks like for each table
+- Agent integration: a guardrail that coding and data agents call before applying a change
+
+Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Status
+
+Alpha. The checks and verdicts are stable enough to try in CI; options and output formats may
+still change before 1.0.
+
+## Citation
+
+If you use pipeverify in research, please cite the PipeMend benchmark that motivated it
+(see [CITATION.cff](CITATION.cff)).
+
+## License
+
+Apache-2.0

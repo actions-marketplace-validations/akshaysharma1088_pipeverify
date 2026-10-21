@@ -1,0 +1,8 @@
+# Restates revenue for late refunds on one day, as intended.
+tables:
+  - name: gold.daily_sales
+    before: ../../before/daily_sales.parquet
+    after: daily_sales.parquet
+    key: [store_id, sale_date]
+    ignore: [loaded_at]
+    expect_change: [revenue]
