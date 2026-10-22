@@ -8,6 +8,7 @@
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 [![PyPI](https://img.shields.io/pypi/v/pipeverify)](https://pypi.org/project/pipeverify/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23542277.svg)](https://doi.org/10.5281/zenodo.23542277)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/akshaysharma1088/pipeverify/blob/main/examples/notebooks/quickstart.ipynb)
 
 A pipeline change can pass every test, finish on time and keep the schema intact while quietly
 dropping rows, duplicating keys or changing what a column means. More of these changes are now
@@ -33,6 +34,8 @@ the agents made. What caught them was comparing the data itself. pipeverify pack
 so any team can run it on every change.
 
 ## Quick start
+
+No install needed to try it: [open the 5-minute notebook in Colab](https://colab.research.google.com/github/akshaysharma1088/pipeverify/blob/main/examples/notebooks/quickstart.ipynb).
 
 ```bash
 pip install pipeverify
@@ -219,6 +222,12 @@ This adds a short plain-English explanation of what probably happened and what t
 It is off by default. Only the findings are sent (check names, counts, percentages, column names);
 example values from your data are removed first. The verdict never depends on the LLM.
 
+## Who uses pipeverify
+
+See [ADOPTERS.md](ADOPTERS.md). Using it at work or in a project?
+[Tell us how](https://github.com/akshaysharma1088/pipeverify/issues/new?template=share_usage.yml), even
+in one line. It helps other teams decide whether to try it and shapes what gets built next.
+
 ## Roadmap
 
 - Native adapters for dbt (compare a PR's models against production), Airflow and Spark
@@ -226,7 +235,9 @@ example values from your data are removed first. The verdict never depends on th
 - Rules learned from history: what "normal" change looks like for each table
 - Agent integration: a guardrail that coding and data agents call before applying a change
 
-Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+Ideas and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[good first issues](https://github.com/akshaysharma1088/pipeverify/labels/good%20first%20issue).
+Questions go in [Discussions](https://github.com/akshaysharma1088/pipeverify/discussions).
 
 ## Status
 

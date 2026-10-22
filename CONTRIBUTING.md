@@ -14,6 +14,12 @@ pytest -q
 
 ## Good first contributions
 
+Issues labelled [good first issue](https://github.com/akshaysharma1088/pipeverify/labels/good%20first%20issue)
+are small and well described. Comment on one to claim it. For questions or ideas, use
+[Discussions](https://github.com/akshaysharma1088/pipeverify/discussions).
+
+Other welcome contributions:
+
 - A new check for a kind of silent data harm you have seen in production. Add it to
   `pipeverify/checks.py`, add a test, and add a demo scenario if it helps explain it.
 - A source adapter (for example a native Snowflake or BigQuery reader that pushes work down).
@@ -30,3 +36,8 @@ pytest -q
 
 Open an issue with the command you ran, the output, and if possible two tiny CSV files that
 reproduce it.
+
+## Using pipeverify?
+
+Add your team to [ADOPTERS.md](ADOPTERS.md) or
+[share how you use it](https://github.com/akshaysharma1088/pipeverify/issues/new?template=share_usage.yml).
