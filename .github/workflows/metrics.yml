@@ -1,5 +1,5 @@
 name: metrics
-# GitHub keeps traffic data for 14 days only. This saves it, plus stars, forks, and
+# GitHub keeps traffic data for 14 days only. This saves it, plus stars, forks, PyPI downloads and
 # Zenodo stats, into metrics/ every few days so the full history is kept.
 on:
   schedule:
@@ -20,8 +20,8 @@ jobs:
         env:
           # A fine-grained token with "Administration: read" on this repo. Without it, traffic is skipped.
           GH_TOKEN: ${{ secrets.METRICS_TOKEN || github.token }}
-          PYPI_PACKAGE: ""
-          ZENODO_RECORDS: "23510784"
+          PYPI_PACKAGE: pipeverify
+          ZENODO_RECORDS: "23542278,23544371"
         run: python scripts/collect_metrics.py
       - name: Commit
         run: |
