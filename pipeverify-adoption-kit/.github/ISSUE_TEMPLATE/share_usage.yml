@@ -1,0 +1,40 @@
+name: Share how you use pipeverify
+description: Tell us where pipeverify runs and what it caught. It helps the project and other teams.
+title: "Usage: "
+labels: [adopter]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking a minute. Share only what you are comfortable making public.
+        Leave anything confidential out, or tick the box below and we will keep the details private.
+  - type: input
+    id: org
+    attributes:
+      label: Organization or project (optional)
+      description: Leave empty to stay anonymous.
+  - type: input
+    id: role
+    attributes:
+      label: Your role (optional)
+      placeholder: "Data engineer, analytics lead, ..."
+  - type: textarea
+    id: how
+    attributes:
+      label: How you use it
+      placeholder: "GitHub Action on dbt pull requests, 15 tables; Python API inside an Airflow task; ..."
+    validations:
+      required: true
+  - type: textarea
+    id: caught
+    attributes:
+      label: What it caught or saved (optional)
+      placeholder: "Blocked a join that doubled revenue for one region before it reached the dashboard."
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Permissions
+      options:
+        - label: You may list my organization or project in ADOPTERS.md.
+        - label: You may quote this description publicly.
+        - label: I am open to a short follow-up conversation.

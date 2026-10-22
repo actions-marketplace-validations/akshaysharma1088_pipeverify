@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/akshaysharma1088/pipeverify/discussions
+    about: Ask how to set something up, or discuss an idea before opening an issue.
