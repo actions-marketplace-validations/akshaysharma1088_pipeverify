@@ -99,6 +99,8 @@ Every one of these runs successfully and keeps the same schema.
 SQL databases need `pip install "pipeverify[sql]"` plus the driver for your database. Environment
 variables in URLs are expanded, so credentials stay out of the config file.
 
+See [SQL source examples](docs/sources.md) for Postgres, Snowflake and BigQuery.
+
 ## Config
 
 Check many tables at once with `pipeverify.yml` (`pipeverify init` writes a starter file):
