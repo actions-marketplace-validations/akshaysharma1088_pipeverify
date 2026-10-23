@@ -96,6 +96,17 @@ def _resolve(path: str, base_dir: str) -> str:
     return path if os.path.isabs(path) else os.path.normpath(os.path.join(base_dir, path))
 
 
+COMPRESSION_SUFFIXES = (".gz", ".zst")
+
+
+def _split_extension(path: str) -> tuple[str, str]:
+    """Return (file extension, compression suffix), e.g. 'orders.csv.gz' -> ('.csv', '.gz')."""
+    base, ext = os.path.splitext(path.lower())
+    if ext in COMPRESSION_SUFFIXES:
+        return os.path.splitext(base)[1], ext
+    return ext, ""
+
+
 def load(con: duckdb.DuckDBPyConnection, source: Source, name: str) -> None:
     """Materialize a source as table `name` in the DuckDB connection."""
     if source.kind == "dataframe":
@@ -107,10 +118,16 @@ def load(con: duckdb.DuckDBPyConnection, source: Source, name: str) -> None:
         path = source.path or ""
         if not os.path.exists(path):
             raise SourceError(f"File not found: {path}")
-        ext = os.path.splitext(path)[1].lower()
+        ext, compression = _split_extension(path)
         reader = FILE_READERS.get(ext)
         if reader is None:
-            raise SourceError(f"Unsupported file type '{ext}'. Use csv, parquet or json.")
+            raise SourceError(
+                f"Unsupported file type '{ext}{compression}'. "
+                "Use csv, parquet or json, optionally compressed with .gz or .zst.")
+        if compression and reader == "read_parquet":
+            raise SourceError(
+                f"Compressed Parquet ('{ext}{compression}') is not supported. Parquet is already "
+                f"compressed internally, so use the plain {ext} file.")
         con.execute(f'CREATE OR REPLACE TABLE "{name}" AS SELECT * FROM {reader}(?)', [path])
         return
     if source.kind == "duckdb":
