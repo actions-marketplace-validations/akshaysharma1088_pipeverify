@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2 (2026-10-23)
+
+- Read compressed CSV and JSON files (`.csv.gz`, `.json.gz`, `.jsonl.gz`, `.zst`). Compressed
+  Parquet gets a clear error, since Parquet is already compressed internally. (#8, thanks @merwin14)
+- Docs: Postgres, Snowflake and BigQuery source examples in `docs/sources.md`. (#7, thanks @merwin14)
+
 ## 0.2.1 (2026-10-21)
 
 - Fix: works with DuckDB 2.0, which no longer allows a new query while an earlier
