@@ -15,6 +15,7 @@ Works with SQL, Spark, dbt, Airflow, or a fix written by an AI agent.
   <a href="https://pepy.tech/projects/pipeverify"><img src="https://static.pepy.tech/personalized-badge/pipeverify?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-4ade80" alt="License"></a>
   <a href="https://github.com/akshaysharma1088/pipeverify/actions/workflows/ci.yml"><img src="https://github.com/akshaysharma1088/pipeverify/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.bestpractices.dev/projects/16715"><img src="https://www.bestpractices.dev/projects/16715/badge" alt="OpenSSF Best Practices"></a>
   <a href="https://doi.org/10.5281/zenodo.23542277"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23542277.svg" alt="DOI"></a>
   <a href="https://colab.research.google.com/github/akshaysharma1088/pipeverify/blob/main/examples/notebooks/quickstart.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab"></a>
 </p>
@@ -45,6 +46,21 @@ In the [PipeMend benchmark](https://github.com/akshaysharma1088/pipemend)
 64 data pipeline incidents. Production-style data quality monitors approved **every** harmful fix
 the agents made. What caught them was comparing the data itself. pipeverify packages that check
 so any team can run it on every change.
+
+## How pipeverify compares
+
+pipeverify does not replace your tests. It answers a different question: did this change harm the data?
+
+| | Tests (dbt tests, Great Expectations, Soda) | Data diff tools (for example dbt `audit_helper`, Datafold) | pipeverify |
+|---|---|---|---|
+| Looks at | One table, against rules you write | Two versions of a table | Two versions of a table, and optionally the raw source |
+| Tells you | Which rules failed | Which rows and values differ | Whether the difference is harmful: pass, review or block, with the evidence |
+| Catches a join fan-out or a unit change | Only if you wrote a rule for it | Shows the changed rows; you judge | Yes, as a duplicate or total-shift finding |
+| Fits in CI | Yes | Varies | Yes: CLI, GitHub Action, dbt and Snowflake sources |
+| Callable by an AI agent | No | No | Yes, through MCP |
+
+Keep your tests for rules that must always hold. Add pipeverify on pull requests and on agent
+changes, where the question is whether the change itself left the data right.
 
 ## Quick start
 
@@ -85,6 +101,8 @@ for s in examples/retail/scenarios/*/; do pipeverify run -c "$s/pipeverify.yml";
 | `5_null_creep` | A renamed source field left region empty for new stores | 🟡 REVIEW |
 
 Every one of these runs successfully and keeps the same schema.
+
+On Windows, if `pipeverify` is "not recognized" after installing, run it as `python -m pipeverify` instead.
 
 ## Sources
 
@@ -239,7 +257,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # ... build the "after" snapshots for this PR here (for example: dbt build --target ci) ...
-      - uses: akshaysharma1088/pipeverify@v0.3.0
+      - uses: akshaysharma1088/pipeverify@v0.3.1
         with:
           config: pipeverify.yml
           fail-on: block      # or review, or never
@@ -308,6 +326,13 @@ pipeverify run --explain
 This adds a short plain-English explanation of what probably happened and what to check next.
 It is off by default. Only the findings are sent (check names, counts, percentages, column names);
 example values from your data are removed first. The verdict never depends on the LLM.
+
+## What data leaves your machine
+
+None of your data, in normal use. Comparisons run locally in an in-memory DuckDB; Snowflake and dbt
+sources run one read-only `SELECT` per snapshot; the MCP server runs on your machine and only
+reads. There is no telemetry. The only outbound call is the optional `--explain` above, which
+sends findings with example values removed, never rows.
 
 ## Who uses pipeverify
 
